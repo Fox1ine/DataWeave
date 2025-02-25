@@ -1,12 +1,10 @@
-
 .venv/
 venv/
-
 
 logs/
 *.log
 
-task1/data/
+*.csv
 
 **/__init__.py
 
@@ -14,4 +12,3 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
