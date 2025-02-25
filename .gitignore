@@ -1,0 +1,17 @@
+
+.venv/
+venv/
+
+
+logs/
+*.log
+
+task1/data/
+
+**/__init__.py
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
