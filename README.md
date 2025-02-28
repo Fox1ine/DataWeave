@@ -247,8 +247,9 @@ Airflow Worker - Executes tasks asynchronously.
 
 #### Airflow DAG Execution Screenshots
 Below are screenshots of the Airflow UI displaying DAG execution and task logs.
-![img_1.png](img/img_1.png)
-![img_2.png](img/img_2.png)
+
+- ![img_1.png](img/img_1.png)
+- ![img_2.png](img/img_2.png)
 
 #### Notes
 - The pipeline runs hourly, and each day's data is stored in its respective daily partition.
@@ -260,4 +261,166 @@ Below are screenshots of the Airflow UI displaying DAG execution and task logs.
     
 ---
 
+## 🧑‍💻 Task 3: ETL: Data Loading
+### Overview
+This task involves setting up a data pipeline to extract, transform, and load (ETL) session data from multiple project databases into an analytics database (analytics_db).
+### 📌 Objectives:
+- Extract user session data from multiple project databases (project_a_db, project_b_db, project_c_db).
+- Enrich session data with transaction details and currency conversion.
+- Load the transformed data into the analytics_sessions table in the analytics_db.
+- Automate the entire process using Apache Airflow DAG, running every 10 minutes.
+- Ensure scalability for future project expansions.
 
+### ⚙️ Airflow Setup
+Installing and Running Airflow with Docker. I use docker-compose.yaml from ```task2```
+Airflow is orchestrated using Docker Compose, which launches the required services:
+- PostgreSQL as Airflow's metadata database.
+- Redis as the Celery broker.
+- Airflow Webserver, Scheduler, Worker for DAG execution.
+
+#### 🛠 Airflow configuration
+Firstly I have .env file inside Airflow contains:
+
+![img_1.png](img/img_3211.png)
+
+🔌 This ensures Airflow tasks can read environment variables for database connections.
+
+Start Airflow:
+```bash
+docker compose up -d
+
+Initialize the Airflow database:
+docker exec -it airflow-webserver airflow db init
+```
+Access the Airflow Web UI at ```http://localhost:8080.```
+
+I had a problem with several Docker Compose files that I was using, my docker is docker-compose.yml:
+- Airflow (task 2): It contains Airflow services (web server, scheduler, worker).
+- Databases (Task 3): Contains three project databases and an analytical database.
+
+Since these are separate docker-compose environments, they do not share the same network by default. To enable communication, I linked them ```via a common external network.```
+
+ ![img.png](img/img312312.png)
+ 
+🔌 Connecting Airflow to Multiple Databases:
+```bash
+
+docker network create airflow_network
+```
+This ensures:
+- All containers in task2 (Airflow) and task3 (PostgreSQL) are in the same network.
+- Airflow can now access databases by their container names instead of localhost.
+
+🔌 **Also, for connection to database, I used:**
+```bash
+postgresql://user:password@project_a_db:5432/project_a_db
+```
+Here, ```project_a_db``` is the container name, allowing Airflow to resolve it within the Docker network.
+
+**And I manually configured connections in Airflow UI (Admin → Connections) for:**
+- postgres_default: Connection to the analytics database.
+- project_a_db, project_b_db, project_c_db: Connections for each project database.
+- ![img_2.png](img/img_213211.png)
+
+### 🏗 The main ETL strategy
+1. **🔹Designing the ETL Workflow**
+- When implementing the ETL pipeline, my main focus was ensuring scalability, modularity, and efficiency. I needed to extract, transform, and load data from three separate project databases (project_a_db, project_b_db, project_c_db) into a centralized analytics database (analytics_db).
+- The decision to separate extraction, transformation, and loading into different scripts (```extract_data.py, enrich_data.py, and load_to_analit_bd.py)``` was made to keep each process isolated, making debugging and testing easier.
+- Using Airflow DAGs for scheduling allowed me to automate the process, ensuring data freshness every 10 minutes.
+- I structured the DAG tasks (extract, enrich, load) to execute sequentially while allowing potential parallelism in the future.
+
+2. **🔹Schemas**
+- I saved the scripts for creating tables in ```task3/src/sql``` there are ```analytics_tables.sql``` and schema for others PostgreSQL
+- One of the key considerations in database design was query performance optimization. Since analytics queries involve aggregations and joins, I created indexes on frequently used fields.
+- **🔹Indexes in ```projects_tables.sql``` :**
+- Primary Key Indexes: id fields in tables like user_sessions, events, and transactions are indexed automatically.
+- ```bash 
+  CREATE INDEX idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX idx_events_user_id ON events(user_id);
+``` These ensure fast lookups for ```user-based``` analytics.
+- Timestamps Indexes:
+```bash 
+CREATE INDEX idx_user_sessions_last_activity ON user_sessions(last_activity_at);
+```
+Since filtering by session date is frequent, this helps optimize query execution time.
+
+- **🔹Indexes in ```analytics_tables.sql (Analytics Database)```** (how I said u can check the script ```task3/src/sql/analytics_tables.sql```)
+```bash 
+CREATE INDEX idx_analytics_sessions_user_date ON analytics_sessions(user_id, session_date);
+```
+This ensures efficient filtering and aggregation when querying user sessions per date.
+
+### Handling Multiple Projects & Scalability
+The system is designed to support up to 10 project databases in the future. To achieve this:
+- Instead of hardcoding database URLs, I store them in an .env file and read them dynamically in ```extract_data.py```:
+```bash
+DB_CONNECTIONS = {
+    "project_a": os.getenv("PROJECT_A_DB_URL"),
+    "project_b": os.getenv("PROJECT_B_DB_URL"),
+    "project_c": os.getenv("PROJECT_C_DB_URL")
+}
+```
+- This allows for adding more projects without modifying the DAG, only updating the .env file.
+- The ```extract_data.py``` script loops over all project databases, making it adaptable for future expansion.
+
+### 🚀 Ensuring Incremental Data Loads
+- To avoid reprocessing the entire dataset every time:
+    I retrieve the last processed session date from analytics_sessions:
+```aiignore
+SELECT MAX(session_date) FROM analytics_sessions;
+```
+- Only new sessions are inserted, preventing duplication.
+
+### 🔄 Data Storage and Processing Locations
+- Raw data is stored in: /opt/airflow/data/extracted_sessions;
+- Enriched data is stored in: /opt/airflow/data/enriched_sessions
+- Final loaded data goes to: analytics_sessions table in analytics_db
+**I also saved the conclusions in the repository, you can look in the folder - ```task3/data```**
+
+### 🖥️  DAG Automation & Monitoring - ```etl_analytics_sessions_dag_task3.py```
+- The ETL process runs every 10 minutes to ensure fresh data.
+- If any task fails, Airflow automatically retries up to 1 time before marking it as failed.
+- Logs are available in /opt/airflow/logs for debugging.
+
+![img_3.png](img/img_3311.png)
+
+
+### 🏆 Final Thoughts & Reflections on the Test Assignment
+**🌟 Overview of the Challenge**
+
+**This test assignment was an extensive real-world simulation of a data engineer’s responsibilities—designing an end-to-end ETL pipeline from scratch, handling multiple data sources, ensuring data integrity, and integrating everything into a scalable workflow using Airflow.**
+
+**The challenge required:**
+- ✔️ Database architecture design – planning schema structure, optimizing indexing, and handling transactions efficiently.
+- ✔️ Airflow automation – implementing DAGs to extract, transform, and load session data at regular intervals.
+- ✔️ Dockerized environment setup – managing multiple services across separate docker-compose configurations while ensuring proper networking between them.
+- ✔️ Handling multiple databases dynamically – making the pipeline scalable to support up to 10 projects in the future.
+- ✔️ Debugging connectivity & permission issues – resolving network, access, and connection problems while integrating various components.
+
+This was not just a coding challenge—it tested problem-solving abilities, debugging skills, and architectural decision-making.
+
+### 📈 Additional Improvements & Future Work (Just my thoughts)
+
+While the ETL pipeline is now fully functional, there are further improvements that could enhance its robustness and efficiency:
+- **🚀 1. Distributed Processing with Apache Spark**
+-Currently, data transformation & enrichment happens using Pandas, which works well for moderate-sized datasets. However, as the data grows:
+- ✔️ Switching to Apache Spark could allow distributed processing for better scalability.
+- ✔️ Using Spark SQL for transformations instead of Pandas would improve parallel execution.
+- 🔄 2. Implementing Change Data Capture (CDC)
+
+- Right now, session updates rely on SELECT MAX(session_date) to detect new data.
+- An event-driven CDC approach (e.g., Debezium + Kafka) would:
+- ✔️ Enable real-time updates instead of batch processing.
+- ✔️ Improve efficiency by reducing the amount of scanned data.
+
+- 🛠️ 3. Adding Unit Tests for ETL Components
+
+- ✔️ Implementing unit tests for data extraction & transformation would improve pipeline reliability.
+- ✔️ Using pytest + mock databases could allow automated validation of data integrity.
+
+- 🔒 4. Enhancing Security & Access Control
+
+- ✔️ Role-based access control (RBAC) in Airflow UI to prevent unauthorized DAG execution.
+- ✔️ Storing sensitive credentials in a secrets manager instead of .env files.
+
+---

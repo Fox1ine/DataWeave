@@ -3,16 +3,11 @@ import psycopg2
 from psycopg2 import sql
 from dotenv import load_dotenv
 
-# Загружаем переменные окружения из .env
-load_dotenv()  # предполагается, что .env находится в текущей директории или доступен
+load_dotenv()
 
-# Путь к директории с данными
 DATA_PATH = os.getenv("DATA_RAW_PATH")
 
-# Конфигурация подключения к базам данных
-# Обратите внимание: переменные должны быть заданы в .env в виде:
-#   PROJECT_A_DB_URL=postgresql+psycopg2://user:password@localhost:5433/project_a_db
-# Здесь мы преобразуем URL, заменяя "postgresql+psycopg2://" на "postgresql://"
+
 DB_CONFIG = {
     "project_a": {
         "url": os.getenv("PROJECT_A_DB_URL"),
