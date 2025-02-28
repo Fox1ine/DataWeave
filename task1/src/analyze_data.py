@@ -3,9 +3,12 @@ import pandas as pd
 from dotenv import load_dotenv
 from task1.logging_config import logger
 
-load_dotenv()
+
+dotenv_path = os.getenv("DOTENV_PATH")
+load_dotenv(dotenv_path)
 raw_data_path = os.getenv("RAW_DATA_PATH")
 logger.info("Loaded environment variables.")
+
 
 try:
     logger.info("Starting data analysis...")

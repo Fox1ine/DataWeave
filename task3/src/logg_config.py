@@ -4,10 +4,10 @@ from dotenv import load_dotenv
 
 dotenv_path = os.getenv("DOTENV_PATH")
 load_dotenv(dotenv_path)
-LOG_DIR = os.getenv("LOGGING_PATH", "task1/logs")
+LOG_DIR = os.getenv("LOGGING_PATH", "task3/logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
-LOG_FILE = os.path.join(LOG_DIR, "task1.log")
+LOG_FILE = os.path.join(LOG_DIR, "task3.log")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,4 +18,4 @@ logging.basicConfig(
     ]
 )
 
-logger = logging.getLogger("task1")
+logger = logging.getLogger("task3")

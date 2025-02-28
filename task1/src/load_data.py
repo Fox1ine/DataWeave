@@ -4,13 +4,13 @@ from sqlalchemy import create_engine
 from dotenv import load_dotenv
 from task1.logging_config import logger
 
-# Load environment variables
-load_dotenv()
+dotenv_path = os.getenv("DOTENV_PATH")
+load_dotenv(dotenv_path)
 db_url = os.getenv("DATABASE_URL")
 cleaned_file = os.getenv("CLEANED_DATA_PATH")
 
 try:
-    df = pd.read_csv(cleaned_file)
+    df = pd.read_csv(cleaned_file   )
     logger.info(f"Loaded cleaned dataset: {df.shape[0]} rows, {df.shape[1]} columns.")
 
     # Rename columns to match PostgreSQL table column names
@@ -20,10 +20,14 @@ try:
         "census tract": "census_tract",
     }, inplace=True)
 
-    # Insert data into the PostgreSQL table
+
     engine = create_engine(db_url)
-    df.to_sql("nyc_trees", engine, if_exists="append", index=False)
-    logger.info("Data loaded into PostgreSQL table 'nyc_trees' successfully.")
+
+    # Batch insert using `chunksize`
+    chunksize = 1000
+    df.to_sql("nyc_trees", engine, if_exists="append", index=False, method="multi", chunksize=chunksize)
+
+    logger.info(f"Data loaded into PostgreSQL table 'nyc_trees' successfully in batches of {chunksize} rows.")
 
 except Exception as e:
     logger.exception("An error occurred while loading data into PostgreSQL:")

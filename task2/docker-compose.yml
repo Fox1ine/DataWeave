@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: airflow_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_airflow_data:/var/lib/postgresql/data
+    networks:
+      - airflow_network
+
+  redis:
+    image: redis:6
+    container_name: airflow_redis
+    restart: always
+    ports:
+      - "${REDIS_PORT}:6379"
+    networks:
+      - airflow_network
+
+  airflow-webserver:
+    image: apache/airflow:2.6.3
+    container_name: airflow_webserver
+    user: "airflow"
+    restart: always
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - DOTENV_PATH=/opt/airflow/dags/.env
+      - AIRFLOW_HOME=/opt/airflow
+      - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
+      - AIRFLOW__CORE__EXECUTOR=${AIRFLOW_EXECUTOR}
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=${AIRFLOW_SQL_ALCHEMY_CONN}
+      - AIRFLOW__CELERY__BROKER_URL=${AIRFLOW_BROKER_URL}
+      - AIRFLOW__CELERY__RESULT_BACKEND=${AIRFLOW_RESULT_BACKEND}
+      - PYTHONPATH=/opt/airflow
+    ports:
+      - "${AIRFLOW_WEBSERVER_PORT}:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./.env:/opt/airflow/.env:ro
+      - ./data:/opt/airflow/data
+    entrypoint: >
+      /bin/bash -c "
+      mkdir -p /opt/airflow/logs/scheduler || echo 'logs exists' &&
+      airflow db init &&
+      airflow users create --username ${AIRFLOW_ADMIN_USER} --password ${AIRFLOW_ADMIN_PASSWORD} --firstname ${AIRFLOW_ADMIN_FIRSTNAME} --lastname ${AIRFLOW_ADMIN_LASTNAME} --role Admin --email ${AIRFLOW_ADMIN_EMAIL} &&
+      airflow webserver"
+    networks:
+      - airflow_network
+
+  airflow-scheduler:
+    image: apache/airflow:2.6.3
+    container_name: airflow_scheduler
+    user: "airflow"
+    restart: always
+    depends_on:
+      - airflow-webserver
+    environment:
+      - DOTENV_PATH=/opt/airflow/dags/.env
+      - AIRFLOW_HOME=/opt/airflow
+      - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
+      - AIRFLOW__CORE__EXECUTOR=${AIRFLOW_EXECUTOR}
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=${AIRFLOW_SQL_ALCHEMY_CONN}
+      - AIRFLOW__CELERY__BROKER_URL=${AIRFLOW_BROKER_URL}
+      - AIRFLOW__CELERY__RESULT_BACKEND=${AIRFLOW_RESULT_BACKEND}
+      - PYTHONPATH=/opt/airflow
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./.env:/opt/airflow/.env:ro
+      - ./data:/opt/airflow/data
+    entrypoint: airflow scheduler
+    networks:
+      - airflow_network
+
+  airflow-worker:
+    image: apache/airflow:2.6.3
+    container_name: airflow_worker
+    restart: always
+    depends_on:
+      - airflow-scheduler
+    env_file:
+      - .env
+    environment:
+      - DOTENV_PATH=/opt/airflow/.env
+      - AIRFLOW_HOME=/opt/airflow
+      - AIRFLOW__CORE__EXECUTOR=${AIRFLOW_EXECUTOR}
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=${AIRFLOW_SQL_ALCHEMY_CONN}
+      - AIRFLOW__CELERY__BROKER_URL=${AIRFLOW_BROKER_URL}
+      - AIRFLOW__CELERY__RESULT_BACKEND=${AIRFLOW_RESULT_BACKEND}
+      - PYTHONPATH=/opt/airflow/dags
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./data:/opt/airflow/data
+    entrypoint: >
+      /bin/bash -c "
+      printenv | grep DATA &&
+      exec airflow celery worker"
+    networks:
+      - airflow_network
+
+volumes:
+  postgres_airflow_data:
+
+networks:
+  airflow_network:
+    external: true

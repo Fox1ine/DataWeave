@@ -3,8 +3,9 @@ import psycopg2
 from dotenv import load_dotenv
 from task1.logging_config import logger
 
-# Load environment variables
-load_dotenv()
+
+dotenv_path = os.getenv("DOTENV_PATH")
+load_dotenv(dotenv_path)
 
 DB_NAME = os.getenv("POSTGRES_DB")
 DB_USER = os.getenv("POSTGRES_USER")
@@ -13,7 +14,6 @@ DB_HOST = os.getenv("POSTGRES_HOST")
 DB_PORT = os.getenv("POSTGRES_PORT")
 
 SQL_FILE_PATH = os.getenv("CREATE_TABLE_SQL_PATH")
-
 
 
 try:

@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  project_a_db:
+    image: postgres:15
+    container_name: project_a_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: project_a_db
+    ports:
+      - "5433:5432"
+    restart: always
+    networks:
+      - airflow_network
+
+  project_b_db:
+    image: postgres:15
+    container_name: project_b_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: project_b_db
+    ports:
+      - "5434:5432"
+    restart: always
+    networks:
+      - airflow_network
+
+  project_c_db:
+    image: postgres:15
+    container_name: project_c_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: project_c_db
+    ports:
+      - "5435:5432"
+    restart: always
+    networks:
+      - airflow_network
+
+
+  analytics_db:
+    image: postgres:15
+    container_name: analytics_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: analytics_db
+    ports:
+      - "5436:5432"
+    restart: always
+    networks:
+      - airflow_network
+
+networks:
+  airflow_network:
+    external: true

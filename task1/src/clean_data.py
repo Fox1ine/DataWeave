@@ -1,10 +1,11 @@
 import os
+import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from task1.logging_config import logger
 
-# Load environment variables from .env
-load_dotenv()
+dotenv_path = os.getenv("DOTENV_PATH")
+load_dotenv(dotenv_path)
 raw_data_path = os.getenv("RAW_DATA_PATH")
 
 try:
@@ -16,6 +17,12 @@ try:
     initial_count = df.shape[0]
     df = df.drop_duplicates()
     logger.info(f"Removed {initial_count - df.shape[0]} duplicate rows.")
+
+    df.loc[df['tree_dbh'] > 100, 'tree_dbh'] = np.nan
+    df['tree_dbh'].fillna(method='ffill', inplace=True)
+
+
+    df['status'] = df['status'].str.lower()
 
     # Fill missing values in key columns with 'Unknown'
     for col in ['health', 'spc_latin', 'spc_common']:
